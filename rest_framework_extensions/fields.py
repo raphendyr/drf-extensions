@@ -52,10 +52,10 @@ class NestedHyperlinkedRelatedField(HyperlinkedRelatedField):
         self.__lookup_map = lookup_map
         assert 'lookup_field' not in kwargs, "Do not use `lookup_field` use `lookup_map` instead."
         assert 'lookup_url_kwarg' not in kwargs, "Do not use `lookup_url_kwarg` use `lookup_map` instead."
-        # FIXME: implement update operations with related fields
-        kwargs['read_only'] = True
-        kwargs['queryset'] = None
         super(NestedHyperlinkedRelatedField, self).__init__(**kwargs)
+
+    def use_pk_only_optimization(self):
+        return False
 
     @cached_property
     def _lookup_map(self):
@@ -86,6 +86,16 @@ class NestedHyperlinkedRelatedField(HyperlinkedRelatedField):
         map_ = {lookup_url_kw: lookup_field}
         map_.update(parent_lookup_map)
         return map_
+
+    def get_object(self, view_name, view_args, view_kwargs):
+        def field_to_q(field):
+            return field.replace('.', '__')
+        lookup_map = self._lookup_map
+        lookup_kwargs = dict((
+            (field_to_q(lookup_map[key]), value)
+            for (key, value) in view_kwargs.items()
+        ))
+        return self.get_queryset().get(**lookup_kwargs)
 
     def get_url(self, obj, view_name, request, format):
         # Unsaved objects will not have a valid URL.
